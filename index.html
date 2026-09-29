@@ -162,19 +162,25 @@
 
 
     // =========================
-    // ПРИ ОТКРЫТИИ MINI APP
+    // ДИАГНОСТИКА + СОХРАНЕНИЕ
     // =========================
 
     try {
       const data = window.WebApp?.initDataUnsafe;
       const user = data?.user;
 
+      alert(
+        "USER ID: " + (user?.id || "НЕТ") +
+        "\nИмя: " + (user?.first_name || "НЕТ") +
+        "\nPOST: " + (data?.start_param || "НЕТ")
+      );
+
       if (user && user.id) {
         saveLead(user, data.start_param || "");
       }
 
     } catch (error) {
-      console.error("Ошибка MAX:", error);
+      alert("Ошибка MAX: " + error.message);
     }
   </script>
 
