@@ -90,8 +90,8 @@
         Можно дистанционно или в офисе
       </div>
 
-      <button onclick="contactSpecialist()">
-        Написать специалисту
+      <button onclick="openBot()">
+        Посмотреть, что можно сделать
       </button>
 
       <div class="privacy">
@@ -105,6 +105,11 @@
   <script>
     const SCRIPT_URL =
       "https://script.google.com/macros/s/AKfycbzQyaWoCmaXliVoISdh67ofzMBQ30RZE6rrLJg1NNNJ10tbT42mwA5jsPv-cuRTDVmU/exec";
+
+
+    // =========================
+    // СОХРАНЯЕМ ПЕРЕХОД В ТАБЛИЦУ
+    // =========================
 
     async function saveLead(user, source) {
       const payload = {
@@ -127,13 +132,38 @@
           body: JSON.stringify(payload)
         });
       } catch (error) {
-        console.error(error);
+        console.error("Ошибка сохранения лида:", error);
       }
     }
 
-    function contactSpecialist() {
-      alert("Кнопку связи подключим следующим этапом.");
+
+    // =========================
+    // ОТКРЫВАЕМ БОТА
+    // =========================
+
+    function openBot() {
+      const webApp = window.WebApp;
+
+      const source =
+        webApp?.initDataUnsafe?.start_param ||
+        new URLSearchParams(window.location.search).get("WebAppStartParam") ||
+        "";
+
+      const botUrl =
+        "https://max.ru/se14491443_bot?start=" +
+        encodeURIComponent(source);
+
+      if (webApp && typeof webApp.openMaxLink === "function") {
+        webApp.openMaxLink(botUrl);
+      } else {
+        window.location.href = botUrl;
+      }
     }
+
+
+    // =========================
+    // ПРИ ОТКРЫТИИ MINI APP
+    // =========================
 
     try {
       const data = window.WebApp?.initDataUnsafe;
@@ -142,8 +172,9 @@
       if (user && user.id) {
         saveLead(user, data.start_param || "");
       }
+
     } catch (error) {
-      console.error(error);
+      console.error("Ошибка MAX:", error);
     }
   </script>
 
