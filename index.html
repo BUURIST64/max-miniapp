@@ -3,51 +3,108 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>MAX mini app test</title>
+
+  <title>Банкротство граждан</title>
 
   <script src="https://st.max.ru/js/max-web-app.js"></script>
 
   <style>
     body {
+      margin: 0;
       font-family: Arial, sans-serif;
-      max-width: 600px;
-      margin: 40px auto;
-      padding: 20px;
-      line-height: 1.5;
+      background: #f7f7f7;
+      color: #111;
+    }
+
+    .wrapper {
+      max-width: 520px;
+      margin: 0 auto;
+      padding: 24px;
     }
 
     .card {
-      padding: 20px;
-      border: 1px solid #ddd;
-      border-radius: 16px;
+      background: #fff;
+      border-radius: 24px;
+      padding: 28px 24px;
+      box-shadow: 0 8px 30px rgba(0,0,0,.06);
     }
 
-    .value {
-      font-weight: bold;
-      word-break: break-word;
+    h1 {
+      margin-top: 0;
+      font-size: 28px;
+      line-height: 1.15;
+    }
+
+    .subtitle {
+      font-size: 18px;
+      line-height: 1.45;
+      margin: 18px 0 26px;
+    }
+
+    .manager {
+      padding: 18px;
+      border-radius: 16px;
+      background: #f2f3f5;
+      margin-bottom: 20px;
+    }
+
+    .manager strong {
+      display: block;
+      font-size: 18px;
+      margin-bottom: 5px;
+    }
+
+    button {
+      width: 100%;
+      border: 0;
+      border-radius: 14px;
+      padding: 16px;
+      font-size: 17px;
+      font-weight: 700;
+      cursor: pointer;
+    }
+
+    .privacy {
+      margin-top: 18px;
+      font-size: 12px;
+      line-height: 1.4;
+      color: #777;
+      text-align: center;
     }
   </style>
 </head>
 
 <body>
 
-  <div class="card">
-    <h2>Тест MAX mini app</h2>
+  <div class="wrapper">
+    <div class="card">
 
-    <p>Имя: <span class="value" id="name">—</span></p>
-    <p>Фамилия: <span class="value" id="lastname">—</span></p>
-    <p>Username: <span class="value" id="username">—</span></p>
-    <p>MAX ID: <span class="value" id="userid">—</span></p>
-    <p>Источник рекламы: <span class="value" id="source">—</span></p>
+      <h1>Банкротство граждан</h1>
 
-    <p id="status">Проверяем данные MAX...</p>
+      <div class="subtitle">
+        Узнайте, какие варианты решения могут быть доступны в вашей ситуации.
+      </div>
+
+      <div class="manager">
+        <strong>Специалист по вопросам задолженности</strong>
+        Можно дистанционно или в офисе
+      </div>
+
+      <button onclick="contactSpecialist()">
+        Написать специалисту
+      </button>
+
+      <div class="privacy">
+        При использовании сервиса могут обрабатываться технические данные MAX,
+        необходимые для работы приложения и определения источника обращения.
+      </div>
+
+    </div>
   </div>
 
   <script>
     const SCRIPT_URL =
       "https://script.google.com/macros/s/AKfycbzQyaWoCmaXliVoISdh67ofzMBQ30RZE6rrLJg1NNNJ10tbT42mwA5jsPv-cuRTDVmU/exec";
-
-    const status = document.getElementById("status");
 
     async function saveLead(user, source) {
       const payload = {
@@ -69,12 +126,13 @@
           },
           body: JSON.stringify(payload)
         });
-
-        status.textContent = "Данные получены и сохранены ✅";
       } catch (error) {
-        status.textContent = "Ошибка отправки данных";
         console.error(error);
       }
+    }
+
+    function contactSpecialist() {
+      alert("Кнопку связи подключим следующим этапом.");
     }
 
     try {
@@ -82,31 +140,10 @@
       const user = data?.user;
 
       if (user && user.id) {
-
-        document.getElementById("name").textContent =
-          user.first_name || "не передано";
-
-        document.getElementById("lastname").textContent =
-          user.last_name || "не передано";
-
-        document.getElementById("username").textContent =
-          user.username ? "@" + user.username : "нет username";
-
-        document.getElementById("userid").textContent =
-          user.id;
-
-        document.getElementById("source").textContent =
-          data.start_param || "источник не передан";
-
         saveLead(user, data.start_param || "");
-
-      } else {
-        status.textContent =
-          "Страница открыта вне MAX или MAX не передал данные пользователя.";
       }
-
     } catch (error) {
-      status.textContent = "Ошибка: " + error.message;
+      console.error(error);
     }
   </script>
 
