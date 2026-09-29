@@ -40,43 +40,69 @@
     <p>MAX ID: <span class="value" id="userid">—</span></p>
     <p>Источник рекламы: <span class="value" id="source">—</span></p>
 
-    <p id="status">Ожидаем запуск из MAX...</p>
+    <p id="status">Проверяем данные MAX...</p>
   </div>
 
   <script>
+    const SCRIPT_URL =
+      "https://script.google.com/macros/s/AKfycbzQyaWoCmaXliVoISdh67ofzMBQ30RZE6rrLJg1NNNJ10tbT42mwA5jsPv-cuRTDVmU/exec";
+
     const status = document.getElementById("status");
 
+    async function saveLead(user, source) {
+      const payload = {
+        first_name: user.first_name || "",
+        last_name: user.last_name || "",
+        username: user.username || "",
+        user_id: user.id || "",
+        source: source || "",
+        manager: "",
+        public_name: ""
+      };
+
+      try {
+        await fetch(SCRIPT_URL, {
+          method: "POST",
+          mode: "no-cors",
+          headers: {
+            "Content-Type": "text/plain;charset=utf-8"
+          },
+          body: JSON.stringify(payload)
+        });
+
+        status.textContent = "Данные получены и сохранены ✅";
+      } catch (error) {
+        status.textContent = "Ошибка отправки данных";
+        console.error(error);
+      }
+    }
+
     try {
-      if (window.WebApp && window.WebApp.initDataUnsafe) {
+      const data = window.WebApp?.initDataUnsafe;
+      const user = data?.user;
 
-        const data = window.WebApp.initDataUnsafe;
-        const user = data.user;
+      if (user && user.id) {
 
-        if (user) {
-          document.getElementById("name").textContent =
-            user.first_name || "не передано";
+        document.getElementById("name").textContent =
+          user.first_name || "не передано";
 
-          document.getElementById("lastname").textContent =
-            user.last_name || "не передано";
+        document.getElementById("lastname").textContent =
+          user.last_name || "не передано";
 
-          document.getElementById("username").textContent =
-            user.username ? "@" + user.username : "нет username";
+        document.getElementById("username").textContent =
+          user.username ? "@" + user.username : "нет username";
 
-          document.getElementById("userid").textContent =
-            user.id || "не передано";
+        document.getElementById("userid").textContent =
+          user.id;
 
-          document.getElementById("source").textContent =
-            data.start_param || "источник не передан";
+        document.getElementById("source").textContent =
+          data.start_param || "источник не передан";
 
-          status.textContent = "Данные MAX получены ✅";
-        } else {
-          status.textContent =
-            "MAX открыт, но данные пользователя не получены.";
-        }
+        saveLead(user, data.start_param || "");
 
       } else {
         status.textContent =
-          "Страница открыта не через MAX — это нормально для обычного браузера.";
+          "Страница открыта вне MAX или MAX не передал данные пользователя.";
       }
 
     } catch (error) {
