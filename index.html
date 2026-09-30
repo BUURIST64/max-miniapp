@@ -1,865 +1,2749 @@
-<!DOCTYPE html>
-<html lang="ru">
+const SPREADSHEET_ID =
+  '12ls9FYM8NehYd0VxFtCo3QPps-SEbiM8Hyup2J1IARw';
 
-<head>
+const RENDER_SEND_URL =
+  'https://max-sender-backend.onrender.com/send';
 
-  <meta charset="UTF-8" />
+const WEB_APP_URL =
+  'https://script.google.com/macros/s/AKfycbzQyaWoCmaXliVoISdh67ofzMBQ30RZE6rrLJg1NNNJ10tbT42mwA5jsPv-cuRTDVmU/exec';
 
-  <meta
-    name="viewport"
-    content="width=device-width, initial-scale=1.0, viewport-fit=cover"
-  />
 
-  <title>Банкротство граждан</title>
+// =====================================================
+// ПАНЕЛЬ
+// =====================================================
 
-  <script src="https://st.max.ru/js/max-web-app.js"></script>
+function doGet(e) {
 
-  <style>
+  const template =
+    HtmlService.createTemplateFromFile('Panel');
 
-    * {
-      box-sizing: border-box;
+  template.managerToken =
+    e &&
+    e.parameter &&
+    e.parameter.token
+      ? String(e.parameter.token)
+      : '';
+
+  return template
+    .evaluate()
+    .setTitle('Клиенты MAX')
+    .setXFrameOptionsMode(
+      HtmlService.XFrameOptionsMode.ALLOWALL
+    );
+}
+
+
+// =====================================================
+// ПРИЁМ ДАННЫХ
+// =====================================================
+
+function doPost(e) {
+
+  try {
+
+    const data =
+      JSON.parse(
+        e.postData.contents
+      );
+
+
+    if (
+      data.action ===
+      'manager_started'
+    ) {
+
+      updateManagerStarted(data);
+
+      return ContentService
+        .createTextOutput(
+          'MANAGER_STARTED_UPDATED'
+        );
     }
 
-    body {
-      margin: 0;
-      min-height: 100vh;
 
-      font-family:
-        -apple-system,
-        BlinkMacSystemFont,
-        "Segoe UI",
-        Arial,
-        sans-serif;
+    if (
+      data.action ===
+      'bot_started'
+    ) {
 
-      background:
-        linear-gradient(
-          180deg,
-          #f4f8fb 0%,
-          #f7f7f7 100%
+      updateBotStarted(data);
+
+      return ContentService
+        .createTextOutput(
+          'BOT_STARTED_UPDATED'
+        );
+    }
+
+
+    if (
+      data.action ===
+      'message_created'
+    ) {
+
+      saveIncomingMessage(data);
+
+      return ContentService
+        .createTextOutput(
+          'MESSAGE_SAVED'
+        );
+    }
+
+
+    if (
+      data.action ===
+      'bot_answer'
+    ) {
+
+      saveBotAnswer(data);
+
+      return ContentService
+        .createTextOutput(
+          'BOT_ANSWER_SAVED'
+        );
+    }
+
+
+    if (
+      data.action ===
+      'bot_human'
+    ) {
+
+      saveHumanRequest(data);
+
+      return ContentService
+        .createTextOutput(
+          'HUMAN_REQUEST_SAVED'
+        );
+    }
+
+
+    saveLead(data);
+
+    return ContentService
+      .createTextOutput(
+        'LEAD_SAVED'
+      );
+
+
+  } catch (error) {
+
+    console.error(error);
+
+    return ContentService
+      .createTextOutput(
+        'ERROR: ' +
+        error.message
+      );
+  }
+}
+
+
+// =====================================================
+// ДОПОЛНИТЕЛЬНЫЕ КОЛОНКИ N-U
+// =====================================================
+
+function ensureLeadExtraColumns() {
+
+  const spreadsheet =
+    SpreadsheetApp.openById(
+      SPREADSHEET_ID
+    );
+
+  const sheet =
+    spreadsheet.getSheets()[0];
+
+
+  const headers = [
+    'Сумма долга',
+    'Платежи',
+    'Вид долгов',
+    'Имущество',
+    'Хочет специалиста',
+    'Непрочитанное',
+    'Последнее сообщение',
+    'Последняя активность'
+  ];
+
+
+  for (
+    let i = 0;
+    i < headers.length;
+    i++
+  ) {
+
+    const column =
+      14 + i;
+
+    const current =
+      String(
+        sheet
+          .getRange(
+            1,
+            column
+          )
+          .getValue() || ''
+      ).trim();
+
+
+    if (!current) {
+
+      sheet
+        .getRange(
+          1,
+          column
+        )
+        .setValue(
+          headers[i]
+        );
+    }
+  }
+}
+
+
+// =====================================================
+// ИСТОРИЯ ПЕРЕХОДОВ
+// =====================================================
+
+function getOrCreateHistorySheet(
+  spreadsheet
+) {
+
+  let sheet =
+    spreadsheet.getSheetByName(
+      'История переходов'
+    );
+
+
+  if (!sheet) {
+
+    sheet =
+      spreadsheet.insertSheet(
+        'История переходов'
+      );
+
+    sheet.appendRow([
+      'Дата и время',
+      'Имя',
+      'Фамилия',
+      'Username',
+      'MAX ID',
+      'Код поста',
+      'Менеджер',
+      'Рекламный посыл',
+      'MAX ID менеджера'
+    ]);
+  }
+
+
+  return sheet;
+}
+
+
+// =====================================================
+// МЕНЕДЖЕР ПО MAX ID
+// =====================================================
+
+function getManagerByMaxId(
+  managerMaxId
+) {
+
+  const spreadsheet =
+    SpreadsheetApp.openById(
+      SPREADSHEET_ID
+    );
+
+  const sheet =
+    spreadsheet.getSheetByName(
+      'Менеджеры'
+    );
+
+
+  if (!sheet) {
+    return null;
+  }
+
+
+  const cleanId =
+    String(
+      managerMaxId || ''
+    ).trim();
+
+
+  if (!cleanId) {
+    return null;
+  }
+
+
+  const rows =
+    sheet
+      .getDataRange()
+      .getValues();
+
+
+  for (
+    let i = 1;
+    i < rows.length;
+    i++
+  ) {
+
+    if (
+      String(
+        rows[i][2] || ''
+      ).trim() ===
+      cleanId
+    ) {
+
+      return {
+
+        name:
+          String(
+            rows[i][0] || ''
+          ).trim(),
+
+        token:
+          String(
+            rows[i][1] || ''
+          ).trim(),
+
+        maxId:
+          String(
+            rows[i][2] || ''
+          ).trim(),
+
+        active:
+          String(
+            rows[i][3] || ''
+          ).trim(),
+
+        chatId:
+          String(
+            rows[i][4] || ''
+          ).trim()
+      };
+    }
+  }
+
+
+  return null;
+}
+
+
+// =====================================================
+// ЭТО МЕНЕДЖЕР?
+// =====================================================
+
+function isManagerMaxId(
+  userId
+) {
+
+  const cleanId =
+    String(
+      userId || ''
+    ).trim();
+
+
+  if (!cleanId) {
+    return false;
+  }
+
+
+  return !!getManagerByMaxId(
+    cleanId
+  );
+}
+
+
+// =====================================================
+// СОХРАНЕНИЕ ЛИДА
+//
+// ПРАВИЛО:
+// один MAX ID = одна карточка.
+//
+// Если клиент открывает рекламу другого менеджера,
+// карточка остаётся одна,
+// но текущий менеджер меняется на последнего выбранного.
+//
+// Все переходы отдельно сохраняются в Истории.
+// =====================================================
+
+function saveLead(data) {
+
+  ensureLeadExtraColumns();
+
+
+  const userId =
+    String(
+      data.user_id || ''
+    ).trim();
+
+
+  if (!userId) {
+
+    throw new Error(
+      'Не передан MAX ID клиента'
+    );
+  }
+
+
+  // Сотрудники не должны становиться клиентами
+  if (
+    isManagerMaxId(
+      userId
+    )
+  ) {
+
+    console.log(
+      'Пропущен менеджер в saveLead: ' +
+      userId
+    );
+
+    return;
+  }
+
+
+  const spreadsheet =
+    SpreadsheetApp.openById(
+      SPREADSHEET_ID
+    );
+
+  const leadsSheet =
+    spreadsheet.getSheets()[0];
+
+  const postsSheet =
+    spreadsheet.getSheetByName(
+      'Рекламные посты'
+    );
+
+  const historySheet =
+    getOrCreateHistorySheet(
+      spreadsheet
+    );
+
+
+  const firstName =
+    String(
+      data.first_name || ''
+    ).trim();
+
+  const lastName =
+    String(
+      data.last_name || ''
+    ).trim();
+
+  const username =
+    String(
+      data.username || ''
+    ).trim();
+
+  const postCode =
+    String(
+      data.source || ''
+    ).trim();
+
+
+  let manager = '';
+  let adMessage = '';
+  let managerMaxId = '';
+
+
+  if (
+    postCode &&
+    postsSheet
+  ) {
+
+    const postRows =
+      postsSheet
+        .getDataRange()
+        .getValues();
+
+
+    for (
+      let i = 1;
+      i < postRows.length;
+      i++
+    ) {
+
+      if (
+        String(
+          postRows[i][0] || ''
+        ).trim() ===
+        postCode
+      ) {
+
+        manager =
+          String(
+            postRows[i][1] || ''
+          ).trim();
+
+        adMessage =
+          String(
+            postRows[i][2] || ''
+          ).trim();
+
+        managerMaxId =
+          String(
+            postRows[i][3] || ''
+          ).trim();
+
+        break;
+      }
+    }
+  }
+
+
+  // Каждый переход сохраняем отдельно
+  historySheet.appendRow([
+    new Date(),
+    firstName,
+    lastName,
+    username,
+    userId,
+    postCode,
+    manager,
+    adMessage,
+    managerMaxId
+  ]);
+
+
+  const rows =
+    leadsSheet
+      .getDataRange()
+      .getValues();
+
+
+  let existingRow = 0;
+  let existingHasChat = false;
+
+
+  for (
+    let i = rows.length - 1;
+    i >= 1;
+    i--
+  ) {
+
+    if (
+      String(
+        rows[i][4] || ''
+      ).trim() !==
+      userId
+    ) {
+
+      continue;
+    }
+
+
+    const chatId =
+      String(
+        rows[i][10] || ''
+      ).trim();
+
+
+    if (!existingRow) {
+
+      existingRow =
+        i + 1;
+
+      existingHasChat =
+        !!chatId;
+    }
+
+
+    if (
+      chatId &&
+      !existingHasChat
+    ) {
+
+      existingRow =
+        i + 1;
+
+      existingHasChat =
+        true;
+    }
+  }
+
+
+  // ===================================================
+  // КЛИЕНТ УЖЕ ЕСТЬ
+  //
+  // Обновляем выбранного менеджера,
+  // но НЕ удаляем Chat ID, статус, анкету, переписку.
+  // ===================================================
+
+  if (existingRow) {
+
+    if (firstName) {
+
+      leadsSheet
+        .getRange(
+          existingRow,
+          2
+        )
+        .setValue(
+          firstName
+        );
+    }
+
+
+    if (lastName) {
+
+      leadsSheet
+        .getRange(
+          existingRow,
+          3
+        )
+        .setValue(
+          lastName
+        );
+    }
+
+
+    if (username) {
+
+      leadsSheet
+        .getRange(
+          existingRow,
+          4
+        )
+        .setValue(
+          username
+        );
+    }
+
+
+    if (postCode) {
+
+      leadsSheet
+        .getRange(
+          existingRow,
+          6
+        )
+        .setValue(
+          postCode
+        );
+    }
+
+
+    if (manager) {
+
+      leadsSheet
+        .getRange(
+          existingRow,
+          7
+        )
+        .setValue(
+          manager
+        );
+    }
+
+
+    if (adMessage) {
+
+      leadsSheet
+        .getRange(
+          existingRow,
+          8
+        )
+        .setValue(
+          adMessage
+        );
+    }
+
+
+    if (managerMaxId) {
+
+      leadsSheet
+        .getRange(
+          existingRow,
+          9
+        )
+        .setValue(
+          managerMaxId
+        );
+    }
+
+
+    leadsSheet
+      .getRange(
+        existingRow,
+        21
+      )
+      .setValue(
+        new Date()
+      );
+
+
+    return;
+  }
+
+
+  // Новый клиент
+  leadsSheet.appendRow([
+    new Date(),
+    firstName,
+    lastName,
+    username,
+    userId,
+    postCode,
+    manager,
+    adMessage,
+    managerMaxId,
+    'Новый',
+    '',
+    '',
+    '',
+    '',
+    '',
+    '',
+    '',
+    '',
+    '',
+    '',
+    new Date()
+  ]);
+}
+
+
+// =====================================================
+// РЕГИСТРАЦИЯ МЕНЕДЖЕРА
+// =====================================================
+
+function updateManagerStarted(data) {
+
+  const spreadsheet =
+    SpreadsheetApp.openById(
+      SPREADSHEET_ID
+    );
+
+  const sheet =
+    spreadsheet.getSheetByName(
+      'Менеджеры'
+    );
+
+
+  const managerMaxId =
+    String(
+      data.user_id || ''
+    ).trim();
+
+  const managerChatId =
+    String(
+      data.chat_id || ''
+    ).trim();
+
+
+  const rows =
+    sheet
+      .getDataRange()
+      .getValues();
+
+
+  for (
+    let i = 1;
+    i < rows.length;
+    i++
+  ) {
+
+    if (
+      String(
+        rows[i][2] || ''
+      ).trim() ===
+      managerMaxId
+    ) {
+
+      sheet
+        .getRange(
+          i + 1,
+          5
+        )
+        .setValue(
+          managerChatId
         );
 
-      color: #132132;
+      return;
+    }
+  }
+
+
+  throw new Error(
+    'Менеджер не найден'
+  );
+}
+
+
+// =====================================================
+// УВЕДОМЛЕНИЕ МЕНЕДЖЕРУ
+// =====================================================
+
+function notifyManager(
+  managerMaxId,
+  text
+) {
+
+  const manager =
+    getManagerByMaxId(
+      managerMaxId
+    );
+
+
+  if (
+    !manager ||
+    !manager.chatId
+  ) {
+
+    return;
+  }
+
+
+  const panelLink =
+    WEB_APP_URL +
+    '?token=' +
+    encodeURIComponent(
+      manager.token
+    );
+
+
+  UrlFetchApp.fetch(
+    RENDER_SEND_URL,
+    {
+
+      method:
+        'post',
+
+      contentType:
+        'application/json',
+
+      payload:
+        JSON.stringify({
+
+          chat_id:
+            manager.chatId,
+
+          text:
+            text +
+            '\n\nОткрыть клиентов:\n' +
+            panelLink
+        }),
+
+      muteHttpExceptions:
+        true
+    }
+  );
+}
+
+
+// =====================================================
+// BOT STARTED
+// =====================================================
+
+function updateBotStarted(data) {
+
+  ensureLeadExtraColumns();
+
+
+  const userId =
+    String(
+      data.user_id || ''
+    ).trim();
+
+
+  if (
+    isManagerMaxId(
+      userId
+    )
+  ) {
+
+    console.log(
+      'Пропущен менеджер в updateBotStarted: ' +
+      userId
+    );
+
+    return;
+  }
+
+
+  const spreadsheet =
+    SpreadsheetApp.openById(
+      SPREADSHEET_ID
+    );
+
+  const sheet =
+    spreadsheet.getSheets()[0];
+
+
+  const chatId =
+    String(
+      data.chat_id || ''
+    ).trim();
+
+
+  const rows =
+    sheet
+      .getDataRange()
+      .getValues();
+
+
+  let foundRow = 0;
+
+
+  for (
+    let i = rows.length - 1;
+    i >= 1;
+    i--
+  ) {
+
+    if (
+      String(
+        rows[i][4] || ''
+      ).trim() ===
+      userId
+    ) {
+
+      foundRow =
+        i + 1;
+
+      break;
+    }
+  }
+
+
+  if (!foundRow) {
+
+    throw new Error(
+      'Клиент не найден'
+    );
+  }
+
+
+  const status =
+    String(
+      sheet
+        .getRange(
+          foundRow,
+          10
+        )
+        .getValue() || ''
+    ).trim();
+
+
+  if (
+    !status ||
+    status ===
+    'Бот запущен'
+  ) {
+
+    sheet
+      .getRange(
+        foundRow,
+        10
+      )
+      .setValue(
+        'Новый'
+      );
+  }
+
+
+  sheet
+    .getRange(
+      foundRow,
+      11
+    )
+    .setValue(
+      chatId
+    );
+
+
+  sheet
+    .getRange(
+      foundRow,
+      12
+    )
+    .setValue(
+      'Да'
+    );
+
+
+  sheet
+    .getRange(
+      foundRow,
+      13
+    )
+    .setValue(
+      new Date()
+    );
+
+
+  sheet
+    .getRange(
+      foundRow,
+      21
+    )
+    .setValue(
+      new Date()
+    );
+
+
+  const firstName =
+    String(
+      sheet
+        .getRange(
+          foundRow,
+          2
+        )
+        .getValue() || ''
+    );
+
+  const lastName =
+    String(
+      sheet
+        .getRange(
+          foundRow,
+          3
+        )
+        .getValue() || ''
+    );
+
+  const managerMaxId =
+    String(
+      sheet
+        .getRange(
+          foundRow,
+          9
+        )
+        .getValue() || ''
+    );
+
+  const adMessage =
+    String(
+      sheet
+        .getRange(
+          foundRow,
+          8
+        )
+        .getValue() || ''
+    );
+
+  const postCode =
+    String(
+      sheet
+        .getRange(
+          foundRow,
+          6
+        )
+        .getValue() || ''
+    );
+
+
+  const name =
+    (
+      firstName +
+      ' ' +
+      lastName
+    ).trim() ||
+    'Новый клиент';
+
+
+  notifyManager(
+    managerMaxId,
+    '🔔 Новый клиент\n\n' +
+    name +
+    '\nMAX ID: ' +
+    userId +
+    '\nРеклама: ' +
+    (
+      adMessage ||
+      postCode ||
+      'не указана'
+    )
+  );
+}
+
+
+// =====================================================
+// ПОИСК ЛИДА
+// =====================================================
+
+function findLeadInfo(
+  chatId,
+  userId
+) {
+
+  const cleanUserId =
+    String(
+      userId || ''
+    ).trim();
+
+
+  if (
+    cleanUserId &&
+    isManagerMaxId(
+      cleanUserId
+    )
+  ) {
+
+    return null;
+  }
+
+
+  const spreadsheet =
+    SpreadsheetApp.openById(
+      SPREADSHEET_ID
+    );
+
+  const sheet =
+    spreadsheet.getSheets()[0];
+
+  const rows =
+    sheet
+      .getDataRange()
+      .getValues();
+
+
+  const cleanChatId =
+    String(
+      chatId || ''
+    ).trim();
+
+
+  for (
+    let i = rows.length - 1;
+    i >= 1;
+    i--
+  ) {
+
+    const rowChatId =
+      String(
+        rows[i][10] || ''
+      ).trim();
+
+    const rowUserId =
+      String(
+        rows[i][4] || ''
+      ).trim();
+
+
+    if (
+      isManagerMaxId(
+        rowUserId
+      )
+    ) {
+
+      continue;
     }
 
 
-    .wrapper {
+    if (
+      (
+        cleanChatId &&
+        rowChatId ===
+        cleanChatId
+      ) ||
+      (
+        cleanUserId &&
+        rowUserId ===
+        cleanUserId
+      )
+    ) {
 
-      max-width: 520px;
+      return {
 
-      margin: 0 auto;
+        row:
+          i + 1,
 
-      padding:
-        16px
-        14px
-        calc(24px + env(safe-area-inset-bottom));
+        firstName:
+          String(
+            rows[i][1] || ''
+          ),
+
+        lastName:
+          String(
+            rows[i][2] || ''
+          ),
+
+        userId:
+          String(
+            rows[i][4] || ''
+          ),
+
+        postCode:
+          String(
+            rows[i][5] || ''
+          ),
+
+        manager:
+          String(
+            rows[i][6] || ''
+          ),
+
+        adMessage:
+          String(
+            rows[i][7] || ''
+          ),
+
+        managerMaxId:
+          String(
+            rows[i][8] || ''
+          ),
+
+        status:
+          String(
+            rows[i][9] || ''
+          ),
+
+        chatId:
+          String(
+            rows[i][10] || ''
+          )
+      };
+    }
+  }
+
+
+  return null;
+}
+
+
+// =====================================================
+// ОТВЕТ БОТА
+// =====================================================
+
+function saveBotAnswer(data) {
+
+  ensureLeadExtraColumns();
+
+
+  const userId =
+    String(
+      data.user_id || ''
+    ).trim();
+
+
+  if (
+    isManagerMaxId(
+      userId
+    )
+  ) {
+
+    return;
+  }
+
+
+  const spreadsheet =
+    SpreadsheetApp.openById(
+      SPREADSHEET_ID
+    );
+
+  const sheet =
+    spreadsheet.getSheets()[0];
+
+
+  const lead =
+    findLeadInfo(
+      data.chat_id,
+      data.user_id
+    );
+
+
+  if (!lead) {
+
+    throw new Error(
+      'Клиент не найден'
+    );
+  }
+
+
+  const question =
+    String(
+      data.question || ''
+    );
+
+  const value =
+    String(
+      data.value || ''
+    );
+
+
+  const map = {
+
+    debt:
+      14,
+
+    payments:
+      15,
+
+    debt_type:
+      16,
+
+    property:
+      17
+  };
+
+
+  const column =
+    map[question];
+
+
+  if (!column) {
+
+    throw new Error(
+      'Неизвестный вопрос'
+    );
+  }
+
+
+  sheet
+    .getRange(
+      lead.row,
+      column
+    )
+    .setValue(
+      value
+    );
+
+
+  sheet
+    .getRange(
+      lead.row,
+      21
+    )
+    .setValue(
+      new Date()
+    );
+}
+
+
+// =====================================================
+// ЗАПРОС СПЕЦИАЛИСТА
+// =====================================================
+
+function saveHumanRequest(data) {
+
+  ensureLeadExtraColumns();
+
+
+  const userId =
+    String(
+      data.user_id || ''
+    ).trim();
+
+
+  if (
+    isManagerMaxId(
+      userId
+    )
+  ) {
+
+    return;
+  }
+
+
+  const spreadsheet =
+    SpreadsheetApp.openById(
+      SPREADSHEET_ID
+    );
+
+  const sheet =
+    spreadsheet.getSheets()[0];
+
+
+  const lead =
+    findLeadInfo(
+      data.chat_id,
+      data.user_id
+    );
+
+
+  if (!lead) {
+
+    throw new Error(
+      'Клиент не найден'
+    );
+  }
+
+
+  sheet
+    .getRange(
+      lead.row,
+      18
+    )
+    .setValue(
+      'Да'
+    );
+
+
+  sheet
+    .getRange(
+      lead.row,
+      10
+    )
+    .setValue(
+      'В работе'
+    );
+
+
+  sheet
+    .getRange(
+      lead.row,
+      19
+    )
+    .setValue(
+      'Да'
+    );
+
+
+  sheet
+    .getRange(
+      lead.row,
+      20
+    )
+    .setValue(
+      'Клиент хочет поговорить со специалистом'
+    );
+
+
+  sheet
+    .getRange(
+      lead.row,
+      21
+    )
+    .setValue(
+      new Date()
+    );
+
+
+  const name =
+    (
+      lead.firstName +
+      ' ' +
+      lead.lastName
+    ).trim() ||
+    'Клиент';
+
+
+  notifyManager(
+    lead.managerMaxId,
+    '🔥 Клиент хочет поговорить со специалистом\n\n' +
+    name +
+    '\n\nМожно сразу подключаться к диалогу.'
+  );
+}
+
+
+// =====================================================
+// ВХОДЯЩЕЕ СООБЩЕНИЕ
+// =====================================================
+
+function saveIncomingMessage(data) {
+
+  ensureLeadExtraColumns();
+
+
+  const userId =
+    String(
+      data.user_id || ''
+    ).trim();
+
+
+  if (
+    isManagerMaxId(
+      userId
+    )
+  ) {
+
+    console.log(
+      'Сообщение менеджера пропущено: ' +
+      userId
+    );
+
+    return;
+  }
+
+
+  const spreadsheet =
+    SpreadsheetApp.openById(
+      SPREADSHEET_ID
+    );
+
+  const messagesSheet =
+    spreadsheet.getSheetByName(
+      'Сообщения'
+    );
+
+  const leadsSheet =
+    spreadsheet.getSheets()[0];
+
+
+  const chatId =
+    String(
+      data.chat_id || ''
+    ).trim();
+
+  const text =
+    String(
+      data.text || ''
+    );
+
+  const timestamp =
+    Number(
+      data.timestamp ||
+      Date.now()
+    );
+
+
+  const lead =
+    findLeadInfo(
+      chatId,
+      userId
+    );
+
+
+  let messageDate;
+
+
+  if (
+    timestamp <
+    100000000000
+  ) {
+
+    messageDate =
+      new Date(
+        timestamp * 1000
+      );
+
+  } else {
+
+    messageDate =
+      new Date(
+        timestamp
+      );
+  }
+
+
+  messagesSheet.appendRow([
+    messageDate,
+    chatId,
+    userId,
+    'Клиент',
+    text,
+    lead
+      ? lead.manager
+      : '',
+    lead
+      ? lead.postCode
+      : ''
+  ]);
+
+
+  if (lead) {
+
+    leadsSheet
+      .getRange(
+        lead.row,
+        19
+      )
+      .setValue(
+        'Да'
+      );
+
+
+    leadsSheet
+      .getRange(
+        lead.row,
+        20
+      )
+      .setValue(
+        text
+      );
+
+
+    leadsSheet
+      .getRange(
+        lead.row,
+        21
+      )
+      .setValue(
+        new Date()
+      );
+
+
+    const name =
+      (
+        lead.firstName +
+        ' ' +
+        lead.lastName
+      ).trim() ||
+      'Клиент';
+
+
+    notifyManager(
+      lead.managerMaxId,
+      '💬 Новое сообщение\n\n' +
+      name +
+      ':\n' +
+      (
+        text ||
+        '[сообщение без текста]'
+      )
+    );
+  }
+}
+
+
+// =====================================================
+// МЕНЕДЖЕР ПО TOKEN
+// =====================================================
+
+function getManagerByToken(
+  token
+) {
+
+  const spreadsheet =
+    SpreadsheetApp.openById(
+      SPREADSHEET_ID
+    );
+
+  const sheet =
+    spreadsheet.getSheetByName(
+      'Менеджеры'
+    );
+
+
+  const rows =
+    sheet
+      .getDataRange()
+      .getValues();
+
+
+  for (
+    let i = 1;
+    i < rows.length;
+    i++
+  ) {
+
+    if (
+      String(
+        rows[i][1] || ''
+      ).trim() ===
+        String(
+          token || ''
+        ).trim() &&
+
+      String(
+        rows[i][3] || ''
+      )
+      .trim()
+      .toLowerCase() ===
+        'да'
+    ) {
+
+      return {
+
+        name:
+          String(
+            rows[i][0] || ''
+          ),
+
+        maxId:
+          String(
+            rows[i][2] || ''
+          )
+      };
+    }
+  }
+
+
+  throw new Error(
+    'Неверный или неактивный код доступа'
+  );
+}
+
+
+// =====================================================
+// КЛИЕНТЫ МЕНЕДЖЕРА
+// =====================================================
+
+function getManagerLeads(
+  token
+) {
+
+  ensureLeadExtraColumns();
+
+
+  const manager =
+    getManagerByToken(
+      token
+    );
+
+
+  const spreadsheet =
+    SpreadsheetApp.openById(
+      SPREADSHEET_ID
+    );
+
+  const sheet =
+    spreadsheet.getSheets()[0];
+
+  const rows =
+    sheet
+      .getDataRange()
+      .getValues();
+
+  const timeZone =
+    spreadsheet
+      .getSpreadsheetTimeZone();
+
+
+  const clients = [];
+  const byUser = {};
+
+
+  for (
+    let i = rows.length - 1;
+    i >= 1;
+    i--
+  ) {
+
+    if (
+      String(
+        rows[i][8] || ''
+      ).trim() !==
+      manager.maxId
+    ) {
+
+      continue;
     }
 
 
-    .card {
+    const userId =
+      String(
+        rows[i][4] || ''
+      ).trim();
 
-      background: #ffffff;
 
-      border-radius: 28px;
+    if (
+      isManagerMaxId(
+        userId
+      )
+    ) {
 
-      padding:
-        18px
-        18px
-        20px;
-
-      box-shadow:
-        0 16px 45px
-        rgba(25, 56, 78, .10);
+      continue;
     }
 
 
-    .logo-wrap {
+    const chatId =
+      String(
+        rows[i][10] || ''
+      ).trim();
 
-      display: flex;
 
-      justify-content: center;
-
-      margin-bottom: 12px;
+    if (!userId) {
+      continue;
     }
 
 
-    .logo {
+    if (!byUser[userId]) {
 
-      width: 170px;
+      byUser[userId] = {
+        rowIndex: i,
+        hasChat: !!chatId
+      };
 
-      max-width: 55%;
-
-      height: 64px;
-
-      object-fit: contain;
-
-      mix-blend-mode: multiply;
+      continue;
     }
 
 
-    h1 {
+    if (
+      !byUser[userId].hasChat &&
+      chatId
+    ) {
 
-      margin:
-        0
-        0
-        17px;
-
-      font-size: 30px;
-
-      line-height: 1.05;
-
-      letter-spacing: -.6px;
-
-      text-align: center;
-
-      color: #10253b;
+      byUser[userId] = {
+        rowIndex: i,
+        hasChat: true
+      };
     }
+  }
 
 
-    .manager {
+  Object.keys(
+    byUser
+  ).forEach(
+    function(userId) {
 
-      display: flex;
+      const i =
+        byUser[userId]
+          .rowIndex;
 
-      align-items: center;
 
-      gap: 16px;
+      let date = '';
 
-      padding: 14px;
+      if (
+        rows[i][0] instanceof Date
+      ) {
 
-      margin-bottom: 18px;
+        date =
+          Utilities.formatDate(
+            rows[i][0],
+            timeZone,
+            'dd.MM.yyyy HH:mm'
+          );
 
-      border-radius: 22px;
+      } else {
 
-      background:
-        linear-gradient(
-          135deg,
-          #edf7fc 0%,
-          #ffffff 100%
-        );
-
-      border:
-        1px solid #dcebf3;
-    }
-
-
-    .manager-photo-wrap {
-
-      flex: 0 0 auto;
-
-      width: 138px;
-
-      height: 168px;
-
-      border-radius: 19px;
-
-      overflow: hidden;
-
-      background: #dfe7eb;
-
-      box-shadow:
-        0 10px 24px
-        rgba(24, 69, 101, .15);
-    }
-
-
-    .manager-photo {
-
-      display: block;
-
-      width: 100%;
-
-      height: 100%;
-
-      object-fit: cover;
-
-      object-position:
-        center 22%;
-    }
-
-
-    .manager-info {
-
-      min-width: 0;
-
-      flex: 1;
-    }
-
-
-    .manager-label {
-
-      margin-bottom: 6px;
-
-      font-size: 11px;
-
-      font-weight: 700;
-
-      color: #6f7d89;
-
-      text-transform: uppercase;
-
-      letter-spacing: .5px;
-    }
-
-
-    .manager-name {
-
-      margin-bottom: 7px;
-
-      font-size: 21px;
-
-      line-height: 1.1;
-
-      font-weight: 800;
-
-      color: #12283e;
-    }
-
-
-    .manager-role {
-
-      font-size: 13px;
-
-      line-height: 1.35;
-
-      color: #4e5c67;
-    }
-
-
-    .main-text {
-
-      margin:
-        3px
-        0
-        17px;
-
-      font-size: 17px;
-
-      line-height: 1.4;
-
-      text-align: center;
-
-      color: #3f4d59;
-    }
-
-
-    button {
-
-      position: relative;
-
-      width: 100%;
-
-      min-height: 66px;
-
-      padding:
-        17px
-        48px
-        17px
-        20px;
-
-      border: 0;
-
-      border-radius: 18px;
-
-      cursor: pointer;
-
-      background:
-        linear-gradient(
-          135deg,
-          #0a84d6 0%,
-          #0664ad 100%
-        );
-
-      color: #ffffff;
-
-      font-size: 17px;
-
-      font-weight: 800;
-
-      line-height: 1.2;
-
-      text-align: left;
-
-      box-shadow:
-        0 13px 28px
-        rgba(7, 111, 185, .29);
-
-      transition:
-        transform .12s ease,
-        box-shadow .12s ease;
-    }
-
-
-    button::after {
-
-      content: "→";
-
-      position: absolute;
-
-      right: 20px;
-
-      top: 50%;
-
-      transform:
-        translateY(-50%);
-
-      font-size: 28px;
-
-      font-weight: 400;
-    }
-
-
-    button:active {
-
-      transform:
-        scale(.985);
-
-      box-shadow:
-        0 7px 18px
-        rgba(7, 111, 185, .22);
-    }
-
-
-    .disclaimer {
-
-      margin-top: 18px;
-
-      padding-top: 15px;
-
-      border-top:
-        1px solid #e7ebee;
-
-      font-size: 10.5px;
-
-      line-height: 1.45;
-
-      color: #6b747c;
-    }
-
-
-    .privacy {
-
-      margin-top: 10px;
-
-      font-size: 8.5px;
-
-      line-height: 1.35;
-
-      text-align: center;
-
-      color: #a0a7ac;
-    }
-
-
-    @media (max-width: 390px) {
-
-      h1 {
-        font-size: 27px;
+        date =
+          String(
+            rows[i][0] || ''
+          );
       }
 
-      .manager {
-        gap: 12px;
+
+      let activityTimestamp = 0;
+
+      if (
+        rows[i][20] instanceof Date
+      ) {
+
+        activityTimestamp =
+          rows[i][20]
+            .getTime();
+
+      } else if (
+        rows[i][0] instanceof Date
+      ) {
+
+        activityTimestamp =
+          rows[i][0]
+            .getTime();
       }
 
-      .manager-photo-wrap {
-        width: 118px;
-        height: 148px;
-      }
 
-      .manager-name {
-        font-size: 18px;
-      }
+      clients.push({
 
-      .manager-role {
-        font-size: 12px;
-      }
+        firstName:
+          String(
+            rows[i][1] || ''
+          ),
 
-      .main-text {
-        font-size: 15px;
-      }
+        lastName:
+          String(
+            rows[i][2] || ''
+          ),
 
-      button {
-        font-size: 16px;
-      }
+        userId:
+          String(
+            rows[i][4] || ''
+          ),
+
+        postCode:
+          String(
+            rows[i][5] || ''
+          ),
+
+        adMessage:
+          String(
+            rows[i][7] || ''
+          ),
+
+        status:
+          String(
+            rows[i][9] || 'Новый'
+          ),
+
+        chatId:
+          String(
+            rows[i][10] || ''
+          ),
+
+        date:
+          date,
+
+        debt:
+          String(
+            rows[i][13] || ''
+          ),
+
+        payments:
+          String(
+            rows[i][14] || ''
+          ),
+
+        debtType:
+          String(
+            rows[i][15] || ''
+          ),
+
+        property:
+          String(
+            rows[i][16] || ''
+          ),
+
+        wantsHuman:
+          String(
+            rows[i][17] || ''
+          ),
+
+        unread:
+          String(
+            rows[i][18] || ''
+          ),
+
+        lastMessage:
+          String(
+            rows[i][19] || ''
+          ),
+
+        activityTimestamp:
+          activityTimestamp
+      });
     }
+  );
 
-  </style>
 
-</head>
+  clients.sort(
+    function(a, b) {
 
+      const humanA =
+        a.wantsHuman === 'Да'
+          ? 1
+          : 0;
 
-<body>
+      const humanB =
+        b.wantsHuman === 'Да'
+          ? 1
+          : 0;
 
-  <div class="wrapper">
 
-    <div class="card">
+      if (
+        humanA !==
+        humanB
+      ) {
 
+        return humanB -
+          humanA;
+      }
 
-      <div class="logo-wrap">
 
-        <img
-          class="logo"
-          src="https://drive.google.com/thumbnail?id=1qzBnGuHxaAhSMCudTQAUXOxC8V3fCW2g&sz=w1200"
-          alt="Бизнес-Юрист"
-        >
+      const unreadA =
+        a.unread === 'Да'
+          ? 1
+          : 0;
 
-      </div>
+      const unreadB =
+        b.unread === 'Да'
+          ? 1
+          : 0;
 
 
-      <h1>
-        Банкротство граждан
-      </h1>
+      if (
+        unreadA !==
+        unreadB
+      ) {
 
-
-      <div class="manager">
-
-        <div class="manager-photo-wrap">
-
-          <img
-            id="managerPhoto"
-            class="manager-photo"
-            src=""
-            alt="Специалист"
-          >
-
-        </div>
-
-
-        <div class="manager-info">
-
-          <div class="manager-label">
-            Ваш специалист
-          </div>
-
-
-          <div
-            id="managerName"
-            class="manager-name"
-          >
-            Специалист
-          </div>
-
-
-          <div
-            id="managerRole"
-            class="manager-role"
-          >
-            Специалист по вопросам задолженности
-          </div>
-
-        </div>
-
-      </div>
-
-
-      <div class="main-text">
-
-        Разберёмся, какие варианты
-        могут быть в вашей ситуации.
-
-      </div>
-
-
-      <button onclick="openBot()">
-
-        Посмотреть,
-        что можно сделать
-
-      </button>
-
-
-      <div class="disclaimer">
-
-        Банкротство влечёт негативные последствия,
-        в том числе ограничения на получение кредита
-        и повторное банкротство в течение пяти лет.
-        Предварительно обратитесь к своему кредитору
-        и в МФЦ.
-
-      </div>
-
-
-      <div class="privacy">
-
-        При использовании сервиса могут
-        обрабатываться технические данные MAX,
-        необходимые для работы приложения
-        и определения источника обращения.
-
-      </div>
-
-
-    </div>
-
-  </div>
-
-
-  <script>
-
-    const SCRIPT_URL =
-      "https://script.google.com/macros/s/AKfycbzQyaWoCmaXliVoISdh67ofzMBQ30RZE6rrLJg1NNNJ10tbT42mwA5jsPv-cuRTDVmU/exec";
-
-
-    const ROLE =
-      "Специалист по вопросам задолженности";
-
-
-    const IRINA = {
-
-      name:
-        "Ирина Александровна",
-
-      role:
-        ROLE,
-
-      photo:
-        "https://lh3.googleusercontent.com/d/1F4fKFTHQB6Xh80b93AgEXR4LQ4x_p9-x"
-    };
-
-
-    const VALERIA = {
-
-      name:
-        "Валерия Олеговна",
-
-      role:
-        ROLE,
-
-      photo:
-        "https://lh3.googleusercontent.com/d/1qzySfw1AkMeUvshujdl6R-52YtcML7NX"
-    };
-
-
-    const TATIANA = {
-
-      name:
-        "Татьяна Александровна",
-
-      role:
-        ROLE,
-
-      photo:
-        "https://lh3.googleusercontent.com/d/1KhTRVwqE20_CIvgX0jlJfFrQrmi4bqfM"
-    };
-
-
-    const VIKTORIA = {
-
-      name:
-        "Виктория Дмитриевна",
-
-      role:
-        ROLE,
-
-      photo:
-        "https://lh3.googleusercontent.com/d/1eOP4ECidEQk4zCd2fb3FZdINUcERTAUh"
-    };
-
-
-    const EKATERINA = {
-
-      name:
-        "Екатерина Евгеньевна",
-
-      role:
-        ROLE,
-
-      photo:
-        "https://lh3.googleusercontent.com/d/1KWlQbIKyLT1kRJGbUjfKfJrjBy1m7vdw"
-    };
-
-
-    const MANAGERS = {
-
-      POST001:
-        IRINA,
-
-      IRINA001:
-        IRINA,
-
-      IRINA002:
-        IRINA,
-
-      IRINA003:
-        IRINA,
-
-
-      VALERIA001:
-        VALERIA,
-
-      VALERIA002:
-        VALERIA,
-
-      VALERIA003:
-        VALERIA,
-
-
-      TATIANA001:
-        TATIANA,
-
-      TATIANA002:
-        TATIANA,
-
-      TATIANA003:
-        TATIANA,
-
-
-      VIKTORIA001:
-        VIKTORIA,
-
-      VIKTORIA002:
-        VIKTORIA,
-
-      VIKTORIA003:
-        VIKTORIA,
-
-
-      EKATERINA001:
-        EKATERINA,
-
-      EKATERINA002:
-        EKATERINA,
-
-      EKATERINA003:
-        EKATERINA
-    };
-
-
-    const DEFAULT_MANAGER = {
-
-      name:
-        "Специалист",
-
-      role:
-        "По вопросам задолженности",
-
-      photo:
-        ""
-    };
-
-
-    function getSource() {
-
-      const webApp =
-        window.WebApp;
+        return unreadB -
+          unreadA;
+      }
 
 
       return (
-
-        webApp?.initDataUnsafe
-          ?.start_param ||
-
-        new URLSearchParams(
-          window.location.search
-        ).get(
-          "WebAppStartParam"
-        ) ||
-
-        new URLSearchParams(
-          window.location.search
-        ).get(
-          "startapp"
-        ) ||
-
-        ""
-
+        b.activityTimestamp -
+        a.activityTimestamp
       );
+    }
+  );
+
+
+  return {
+
+    manager:
+      manager.name,
+
+    clients:
+      clients
+  };
+}
+
+
+// =====================================================
+// СТАТУС КЛИЕНТА
+// =====================================================
+
+function updateClientStatus(
+  token,
+  userId,
+  newStatus
+) {
+
+  const manager =
+    getManagerByToken(
+      token
+    );
+
+
+  if (
+    isManagerMaxId(
+      userId
+    )
+  ) {
+
+    throw new Error(
+      'Этот MAX ID принадлежит менеджеру'
+    );
+  }
+
+
+  const allowed = [
+    'Новый',
+    'В работе',
+    'Связались',
+    'Не отвечает',
+    'Консультация',
+    'Договор',
+    'Не целевой'
+  ];
+
+
+  if (
+    allowed.indexOf(
+      newStatus
+    ) === -1
+  ) {
+
+    throw new Error(
+      'Недопустимый статус'
+    );
+  }
+
+
+  const spreadsheet =
+    SpreadsheetApp.openById(
+      SPREADSHEET_ID
+    );
+
+  const sheet =
+    spreadsheet.getSheets()[0];
+
+  const rows =
+    sheet
+      .getDataRange()
+      .getValues();
+
+
+  for (
+    let i = rows.length - 1;
+    i >= 1;
+    i--
+  ) {
+
+    if (
+      String(
+        rows[i][4] || ''
+      ).trim() ===
+        String(userId) &&
+
+      String(
+        rows[i][8] || ''
+      ).trim() ===
+        manager.maxId
+    ) {
+
+      sheet
+        .getRange(
+          i + 1,
+          10
+        )
+        .setValue(
+          newStatus
+        );
+
+
+      return {
+        success: true
+      };
+    }
+  }
+
+
+  throw new Error(
+    'Клиент не найден'
+  );
+}
+
+
+// =====================================================
+// ОТМЕТИТЬ ДИАЛОГ ПРОЧИТАННЫМ
+// =====================================================
+
+function markChatRead(
+  token,
+  chatId
+) {
+
+  const manager =
+    getManagerByToken(
+      token
+    );
+
+
+  const spreadsheet =
+    SpreadsheetApp.openById(
+      SPREADSHEET_ID
+    );
+
+  const sheet =
+    spreadsheet.getSheets()[0];
+
+  const rows =
+    sheet
+      .getDataRange()
+      .getValues();
+
+
+  for (
+    let i = rows.length - 1;
+    i >= 1;
+    i--
+  ) {
+
+    if (
+      String(
+        rows[i][10] || ''
+      ).trim() ===
+        String(chatId) &&
+
+      String(
+        rows[i][8] || ''
+      ).trim() ===
+        manager.maxId
+    ) {
+
+      const rowUserId =
+        String(
+          rows[i][4] || ''
+        ).trim();
+
+
+      if (
+        isManagerMaxId(
+          rowUserId
+        )
+      ) {
+
+        continue;
+      }
+
+
+      sheet
+        .getRange(
+          i + 1,
+          19
+        )
+        .setValue(
+          'Нет'
+        );
+
+
+      return {
+        success: true
+      };
+    }
+  }
+
+
+  return {
+    success: false
+  };
+}
+
+
+// =====================================================
+// ДОСТУП К ЧАТУ
+// =====================================================
+
+function managerCanAccessChat(
+  manager,
+  chatId
+) {
+
+  const spreadsheet =
+    SpreadsheetApp.openById(
+      SPREADSHEET_ID
+    );
+
+  const sheet =
+    spreadsheet.getSheets()[0];
+
+  const rows =
+    sheet
+      .getDataRange()
+      .getValues();
+
+
+  for (
+    let i = 1;
+    i < rows.length;
+    i++
+  ) {
+
+    const rowUserId =
+      String(
+        rows[i][4] || ''
+      ).trim();
+
+
+    if (
+      isManagerMaxId(
+        rowUserId
+      )
+    ) {
+
+      continue;
     }
 
 
-    function renderManager() {
+    if (
+      String(
+        rows[i][8] || ''
+      ).trim() ===
+        manager.maxId &&
 
-      const source =
-        getSource();
+      String(
+        rows[i][10] || ''
+      ).trim() ===
+        String(chatId)
+    ) {
 
-
-      const manager =
-        MANAGERS[source] ||
-        DEFAULT_MANAGER;
-
-
-      document
-        .getElementById(
-          "managerName"
-        )
-        .textContent =
-        manager.name;
+      return true;
+    }
+  }
 
 
-      document
-        .getElementById(
-          "managerRole"
-        )
-        .textContent =
-        manager.role;
+  return false;
+}
 
 
-      const photo =
-        document
-          .getElementById(
-            "managerPhoto"
+// =====================================================
+// ИСТОРИЯ СООБЩЕНИЙ
+// =====================================================
+
+function getChatMessages(
+  token,
+  chatId
+) {
+
+  const manager =
+    getManagerByToken(
+      token
+    );
+
+
+  if (
+    !managerCanAccessChat(
+      manager,
+      chatId
+    )
+  ) {
+
+    throw new Error(
+      'Нет доступа'
+    );
+  }
+
+
+  const spreadsheet =
+    SpreadsheetApp.openById(
+      SPREADSHEET_ID
+    );
+
+  const sheet =
+    spreadsheet.getSheetByName(
+      'Сообщения'
+    );
+
+  const rows =
+    sheet
+      .getDataRange()
+      .getValues();
+
+  const timeZone =
+    spreadsheet
+      .getSpreadsheetTimeZone();
+
+  const messages = [];
+
+
+  for (
+    let i = 1;
+    i < rows.length;
+    i++
+  ) {
+
+    if (
+      String(
+        rows[i][1] || ''
+      ).trim() !==
+      String(chatId)
+    ) {
+
+      continue;
+    }
+
+
+    const rowUserId =
+      String(
+        rows[i][2] || ''
+      ).trim();
+
+
+    if (
+      isManagerMaxId(
+        rowUserId
+      ) &&
+      String(
+        rows[i][3] || ''
+      ).trim() ===
+      'Клиент'
+    ) {
+
+      continue;
+    }
+
+
+    const date =
+      rows[i][0] instanceof Date
+        ? Utilities.formatDate(
+            rows[i][0],
+            timeZone,
+            'dd.MM.yyyy HH:mm'
+          )
+        : String(
+            rows[i][0] || ''
           );
 
 
-      if (manager.photo) {
+    messages.push({
 
-        photo.style.display =
-          "block";
+      date:
+        date,
 
-        photo.src =
-          manager.photo;
+      sender:
+        String(
+          rows[i][3] || ''
+        ),
 
-      } else {
-
-        photo.style.display =
-          "none";
-      }
-
-
-      photo.onerror =
-        function() {
-
-          this.style.display =
-            "none";
-        };
-    }
+      text:
+        String(
+          rows[i][4] || ''
+        )
+    });
+  }
 
 
-    async function saveLead(
-      user,
-      source
+  return {
+    messages:
+      messages
+  };
+}
+
+
+// =====================================================
+// ОТПРАВКА ИЗ ПАНЕЛИ
+// =====================================================
+
+function sendManagerMessage(
+  token,
+  chatId,
+  text
+) {
+
+  try {
+
+    const manager =
+      getManagerByToken(
+        token
+      );
+
+
+    if (
+      !managerCanAccessChat(
+        manager,
+        chatId
+      )
     ) {
 
-      const payload = {
-
-        first_name:
-          user.first_name || "",
-
-        last_name:
-          user.last_name || "",
-
-        username:
-          user.username || "",
-
-        user_id:
-          user.id || "",
-
-        source:
-          source || "",
-
-        manager:
-          "",
-
-        public_name:
-          ""
-      };
-
-
-      try {
-
-        await fetch(
-          SCRIPT_URL,
-          {
-
-            method:
-              "POST",
-
-            mode:
-              "no-cors",
-
-            headers: {
-
-              "Content-Type":
-                "text/plain;charset=utf-8"
-            },
-
-            body:
-              JSON.stringify(
-                payload
-              )
-          }
-        );
-
-
-      } catch (error) {
-
-        console.error(
-          "Ошибка сохранения лида:",
-          error
-        );
-      }
-    }
-
-
-    function openBot() {
-
-      const webApp =
-        window.WebApp;
-
-
-      const source =
-        getSource();
-
-
-      const botUrl =
-        "https://max.ru/se14491443_bot?start=" +
-        encodeURIComponent(
-          source
-        );
-
-
-      if (
-        webApp &&
-        typeof webApp.openMaxLink ===
-          "function"
-      ) {
-
-        webApp.openMaxLink(
-          botUrl
-        );
-
-      } else {
-
-        window.location.href =
-          botUrl;
-      }
-    }
-
-
-    renderManager();
-
-
-    try {
-
-      const data =
-        window.WebApp
-          ?.initDataUnsafe;
-
-
-      const user =
-        data?.user;
-
-
-      if (
-        user &&
-        user.id
-      ) {
-
-        saveLead(
-          user,
-          getSource()
-        );
-      }
-
-
-    } catch (error) {
-
-      console.error(
-        "Ошибка MAX:",
-        error
+      throw new Error(
+        'Нет доступа'
       );
     }
 
-  </script>
 
+    const response =
+      UrlFetchApp.fetch(
+        RENDER_SEND_URL,
+        {
+
+          method:
+            'post',
+
+          contentType:
+            'application/json',
+
+          payload:
+            JSON.stringify({
+
+              chat_id:
+                String(chatId),
+
+              text:
+                String(text)
+            }),
+
+          muteHttpExceptions:
+            true
+        }
+      );
+
+
+    const code =
+      response
+        .getResponseCode();
+
+
+    if (
+      code < 200 ||
+      code >= 300
+    ) {
+
+      return {
+
+        success:
+          false,
+
+        error:
+          response
+            .getContentText()
+      };
+    }
+
+
+    const spreadsheet =
+      SpreadsheetApp.openById(
+        SPREADSHEET_ID
+      );
+
+    const messagesSheet =
+      spreadsheet.getSheetByName(
+        'Сообщения'
+      );
+
+    const leadsSheet =
+      spreadsheet.getSheets()[0];
+
+    const lead =
+      findLeadInfo(
+        chatId,
+        ''
+      );
+
+
+    messagesSheet.appendRow([
+      new Date(),
+      chatId,
+      lead
+        ? lead.userId
+        : '',
+      'Менеджер',
+      text,
+      manager.name,
+      lead
+        ? lead.postCode
+        : ''
+    ]);
+
+
+    if (lead) {
+
+      leadsSheet
+        .getRange(
+          lead.row,
+          20
+        )
+        .setValue(
+          text
+        );
+
+      leadsSheet
+        .getRange(
+          lead.row,
+          21
+        )
+        .setValue(
+          new Date()
+        );
+
+      leadsSheet
+        .getRange(
+          lead.row,
+          19
+        )
+        .setValue(
+          'Нет'
+        );
+    }
+
+
+    return {
+      success: true
+    };
+
+
+  } catch (error) {
+
+    return {
+
+      success:
+        false,
+
+      error:
+        error.message
+    };
+  }
+}
+
+
+// =====================================================
+// ОДНОРАЗОВАЯ ОЧИСТКА МЕНЕДЖЕРОВ ИЗ КЛИЕНТОВ
+// =====================================================
+
+function cleanupManagersFromClientData() {
+
+  const spreadsheet =
+    SpreadsheetApp.openById(
+      SPREADSHEET_ID
+    );
+
+  const managersSheet =
+    spreadsheet.getSheetByName(
+      'Менеджеры'
+    );
+
+  const leadsSheet =
+    spreadsheet.getSheets()[0];
+
+  const messagesSheet =
+    spreadsheet.getSheetByName(
+      'Сообщения'
+    );
+
+  const historySheet =
+    spreadsheet.getSheetByName(
+      'История переходов'
+    );
+
+
+  if (!managersSheet) {
+
+    throw new Error(
+      'Лист Менеджеры не найден'
+    );
+  }
+
+
+  const managerRows =
+    managersSheet
+      .getDataRange()
+      .getValues();
+
+
+  const managerIds = {};
+
+
+  for (
+    let i = 1;
+    i < managerRows.length;
+    i++
+  ) {
+
+    const id =
+      String(
+        managerRows[i][2] || ''
+      ).trim();
+
+
+    if (id) {
+
+      managerIds[id] =
+        true;
+    }
+  }
+
+
+  let deletedLeads = 0;
+  let deletedMessages = 0;
+  let deletedHistory = 0;
+
+
+  const leadRows =
+    leadsSheet
+      .getDataRange()
+      .getValues();
+
+
+  for (
+    let i = leadRows.length - 1;
+    i >= 1;
+    i--
+  ) {
+
+    const userId =
+      String(
+        leadRows[i][4] || ''
+      ).trim();
+
+
+    if (
+      userId &&
+      managerIds[userId]
+    ) {
+
+      leadsSheet.deleteRow(
+        i + 1
+      );
+
+      deletedLeads++;
+    }
+  }
+
+
+  if (messagesSheet) {
+
+    const messageRows =
+      messagesSheet
+        .getDataRange()
+        .getValues();
+
+
+    for (
+      let i = messageRows.length - 1;
+      i >= 1;
+      i--
+    ) {
+
+      const userId =
+        String(
+          messageRows[i][2] || ''
+        ).trim();
+
+      const sender =
+        String(
+          messageRows[i][3] || ''
+        ).trim();
+
+
+      if (
+        userId &&
+        managerIds[userId] &&
+        sender ===
+        'Клиент'
+      ) {
+
+        messagesSheet.deleteRow(
+          i + 1
+        );
+
+        deletedMessages++;
+      }
+    }
+  }
+
+
+  if (historySheet) {
+
+    const historyRows =
+      historySheet
+        .getDataRange()
+        .getValues();
+
+
+    for (
+      let i = historyRows.length - 1;
+      i >= 1;
+      i--
+    ) {
+
+      const userId =
+        String(
+          historyRows[i][4] || ''
+        ).trim();
+
+
+      if (
+        userId &&
+        managerIds[userId]
+      ) {
+
+        historySheet.deleteRow(
+          i + 1
+        );
+
+        deletedHistory++;
+      }
+    }
+  }
+
+
+  Logger.log(
+    'Удалено клиентов: ' +
+    deletedLeads
+  );
+
+  Logger.log(
+    'Удалено сообщений: ' +
+    deletedMessages
+  );
+
+  Logger.log(
+    'Удалено переходов: ' +
+    deletedHistory
+  );
+
+
+  return {
+
+    deletedLeads:
+      deletedLeads,
+
+    deletedMessages:
+      deletedMessages,
+
+    deletedHistory:
+      deletedHistory
+  };
+}
+
+
+// =====================================================
+// WEBHOOK
+// =====================================================
+
+function subscribeWebhook() {
+
+  const response =
+    UrlFetchApp.fetch(
+      'https://max-sender-backend.onrender.com/subscribe',
+      {
+
+        method:
+          'post',
+
+        muteHttpExceptions:
+          true
+      }
+    );
+
+
+  Logger.log(
+    response.getContentText()
+  );
+}
 </body>
 
 </html>
