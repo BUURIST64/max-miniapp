@@ -355,44 +355,30 @@
         font-size: 27px;
       }
 
-
       .manager {
-
         gap: 12px;
       }
 
-
       .manager-photo-wrap {
-
         width: 118px;
-
         height: 148px;
       }
 
-
       .manager-name {
-
         font-size: 18px;
       }
 
-
       .manager-role {
-
         font-size: 12px;
       }
 
-
       .main-text {
-
         font-size: 15px;
       }
 
-
       button {
-
         font-size: 16px;
       }
-
     }
 
   </style>
@@ -512,16 +498,20 @@
       "https://script.google.com/macros/s/AKfycbzQyaWoCmaXliVoISdh67ofzMBQ30RZE6rrLJg1NNNJ10tbT42mwA5jsPv-cuRTDVmU/exec";
 
 
+    const ROLE =
+      "Специалист по вопросам задолженности";
+
+
     const IRINA = {
 
       name:
         "Ирина Александровна",
 
       role:
-        "Специалист по вопросам задолженности",
+        ROLE,
 
       photo:
-        "https://drive.google.com/thumbnail?id=1F4fKFTHQB6Xh80b93AgEXR4LQ4x_p9-x&sz=w1200"
+        "https://lh3.googleusercontent.com/d/1F4fKFTHQB6Xh80b93AgEXR4LQ4x_p9-x"
     };
 
 
@@ -531,10 +521,49 @@
         "Валерия Олеговна",
 
       role:
-        "Специалист по вопросам задолженности",
+        ROLE,
 
       photo:
         "https://lh3.googleusercontent.com/d/1qzySfw1AkMeUvshujdl6R-52YtcML7NX"
+    };
+
+
+    const TATIANA = {
+
+      name:
+        "Татьяна Александровна",
+
+      role:
+        ROLE,
+
+      photo:
+        "https://lh3.googleusercontent.com/d/1KhTRVwqE20_CIvgX0jlJfFrQrmi4bqfM"
+    };
+
+
+    const VIKTORIA = {
+
+      name:
+        "Виктория Дмитриевна",
+
+      role:
+        ROLE,
+
+      photo:
+        "https://lh3.googleusercontent.com/d/1eOP4ECidEQk4zCd2fb3FZdINUcERTAUh"
+    };
+
+
+    const EKATERINA = {
+
+      name:
+        "Екатерина Евгеньевна",
+
+      role:
+        ROLE,
+
+      photo:
+        "https://lh3.googleusercontent.com/d/1KWlQbIKyLT1kRJGbUjfKfJrjBy1m7vdw"
     };
 
 
@@ -552,6 +581,7 @@
       IRINA003:
         IRINA,
 
+
       VALERIA001:
         VALERIA,
 
@@ -559,7 +589,37 @@
         VALERIA,
 
       VALERIA003:
-        VALERIA
+        VALERIA,
+
+
+      TATIANA001:
+        TATIANA,
+
+      TATIANA002:
+        TATIANA,
+
+      TATIANA003:
+        TATIANA,
+
+
+      VIKTORIA001:
+        VIKTORIA,
+
+      VIKTORIA002:
+        VIKTORIA,
+
+      VIKTORIA003:
+        VIKTORIA,
+
+
+      EKATERINA001:
+        EKATERINA,
+
+      EKATERINA002:
+        EKATERINA,
+
+      EKATERINA003:
+        EKATERINA
     };
 
 
@@ -572,7 +632,7 @@
         "По вопросам задолженности",
 
       photo:
-        "https://drive.google.com/thumbnail?id=1F4fKFTHQB6Xh80b93AgEXR4LQ4x_p9-x&sz=w1200"
+        ""
     };
 
 
@@ -639,8 +699,19 @@
           );
 
 
-      photo.src =
-        manager.photo;
+      if (manager.photo) {
+
+        photo.style.display =
+          "block";
+
+        photo.src =
+          manager.photo;
+
+      } else {
+
+        photo.style.display =
+          "none";
+      }
 
 
       photo.onerror =
