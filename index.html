@@ -83,14 +83,27 @@
       aspect-ratio: 4 / 4.5;
       background: #eee8df;
       overflow: hidden;
+      position: relative;
     }
 
     .photo {
-      display: block;
+      display: none;
       width: 100%;
       height: 100%;
       object-fit: cover;
       object-position: center top;
+    }
+
+    .photo-placeholder {
+      width: 100%;
+      height: 100%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      color: #999;
+      font-size: 14px;
+      text-align: center;
+      padding: 20px;
     }
 
     .content {
@@ -132,6 +145,29 @@
 
     .button:active {
       transform: scale(.99);
+    }
+
+    .button:disabled {
+      opacity: .55;
+      cursor: default;
+    }
+
+    .loading {
+      margin-top: 14px;
+      text-align: center;
+      color: #777;
+      font-size: 13px;
+    }
+
+    .error-box {
+      display: none;
+      margin-top: 14px;
+      padding: 12px;
+      border-radius: 12px;
+      background: rgba(176,0,32,.08);
+      color: #8f001b;
+      font-size: 13px;
+      line-height: 1.4;
     }
 
     .disclaimer {
@@ -181,11 +217,20 @@
   <div class="card">
 
     <div class="photo-wrap">
+
       <img
         id="managerPhoto"
         class="photo"
         alt="Специалист"
       >
+
+      <div
+        id="photoPlaceholder"
+        class="photo-placeholder"
+      >
+        Загружаем данные специалиста...
+      </div>
+
     </div>
 
     <div class="content">
@@ -193,23 +238,45 @@
       <div
         id="managerName"
         class="manager-name"
-      ></div>
+      >
+        Загружаем...
+      </div>
 
-      <div class="role">
+      <div
+        id="managerRole"
+        class="role"
+      >
         Специалист по вопросам задолженности
       </div>
 
-      <div class="text">
+      <div
+        id="managerText"
+        class="text"
+      >
         Разберёмся, какие варианты могут быть
         в вашей ситуации.
       </div>
 
       <button
+        id="openBotButton"
         class="button"
         onclick="openBot()"
+        disabled
       >
         Посмотреть, что можно сделать
       </button>
+
+      <div
+        id="loadingStatus"
+        class="loading"
+      >
+        Загружаем информацию...
+      </div>
+
+      <div
+        id="errorBox"
+        class="error-box"
+      ></div>
 
     </div>
 
@@ -249,111 +316,16 @@ const BOT_USERNAME =
   "se14491443_bot";
 
 
-const MANAGERS = {
+let currentSource = "";
 
-  IRINA: {
-    name:
-      "Ирина Александровна",
+let currentManagerData = null;
 
-    photo:
-      "https://lh3.googleusercontent.com/d/1F4fKFTHQB6Xh80b93AgEXR4LQ4x_p9-x"
-  },
+let miniAppLoaded = false;
 
 
-  VALERIA: {
-    name:
-      "Валерия Олеговна",
-
-    photo:
-      "https://lh3.googleusercontent.com/d/1qzySfw1AkMeUvshujdl6R-52YtcML7NX"
-  },
-
-
-  TATIANA: {
-    name:
-      "Татьяна Александровна",
-
-    photo:
-      "https://lh3.googleusercontent.com/d/1KhTRVwqE20_CIvgX0jlJfFrQrmi4bqfM"
-  },
-
-
-  VIKTORIA: {
-    name:
-      "Виктория Дмитриевна",
-
-    photo:
-      "https://lh3.googleusercontent.com/d/1eOP4ECidEQk4zCd2fb3FZdINUcERTAUh"
-  },
-
-
-  EKATERINA: {
-    name:
-      "Екатерина Евгеньевна",
-
-    photo:
-      "https://lh3.googleusercontent.com/d/1KWlQbIKyLT1kRJGbUjfKfJrjBy1m7vdw"
-  }
-
-};
-
-
-const CODE_TO_MANAGER = {
-
-  POST001:
-    "IRINA",
-
-  IRINA001:
-    "IRINA",
-
-  IRINA002:
-    "IRINA",
-
-  IRINA003:
-    "IRINA",
-
-
-  VALERIA001:
-    "VALERIA",
-
-  VALERIA002:
-    "VALERIA",
-
-  VALERIA003:
-    "VALERIA",
-
-
-  TATIANA001:
-    "TATIANA",
-
-  TATIANA002:
-    "TATIANA",
-
-  TATIANA003:
-    "TATIANA",
-
-
-  VIKTORIA001:
-    "VIKTORIA",
-
-  VIKTORIA002:
-    "VIKTORIA",
-
-  VIKTORIA003:
-    "VIKTORIA",
-
-
-  EKATERINA001:
-    "EKATERINA",
-
-  EKATERINA002:
-    "EKATERINA",
-
-  EKATERINA003:
-    "EKATERINA"
-
-};
-
+// =====================================================
+// ПОЛУЧАЕМ КОД РЕКЛАМЫ
+// =====================================================
 
 function getSource() {
 
@@ -453,49 +425,9 @@ function getSource() {
 }
 
 
-function getManager(source) {
-
-  const key =
-    CODE_TO_MANAGER[
-      source
-    ] ||
-    "IRINA";
-
-
-  return MANAGERS[
-    key
-  ];
-}
-
-
-function renderManager() {
-
-  const source =
-    getSource();
-
-
-  const manager =
-    getManager(
-      source
-    );
-
-
-  document
-    .getElementById(
-      "managerName"
-    )
-    .textContent =
-    manager.name;
-
-
-  document
-    .getElementById(
-      "managerPhoto"
-    )
-    .src =
-    manager.photo;
-}
-
+// =====================================================
+// ПОЛУЧАЕМ MAX USER
+// =====================================================
 
 function getMaxUser() {
 
@@ -520,6 +452,342 @@ function getMaxUser() {
 }
 
 
+// =====================================================
+// JSONP CALLBACK
+// =====================================================
+
+function handleMiniAppData(
+  data
+) {
+
+  miniAppLoaded =
+    true;
+
+
+  const loading =
+    document.getElementById(
+      "loadingStatus"
+    );
+
+
+  if (loading) {
+
+    loading.style.display =
+      "none";
+  }
+
+
+  if (
+    !data ||
+    !data.success
+  ) {
+
+    showMiniAppError(
+      data &&
+      data.error
+        ? data.error
+        : "Не удалось загрузить данные специалиста"
+    );
+
+    return;
+  }
+
+
+  currentManagerData =
+    data;
+
+
+  renderManagerData(
+    data
+  );
+
+
+  const button =
+    document.getElementById(
+      "openBotButton"
+    );
+
+
+  button.disabled =
+    false;
+
+
+  saveLead();
+}
+
+
+// =====================================================
+// РИСУЕМ МЕНЕДЖЕРА
+// =====================================================
+
+function renderManagerData(
+  data
+) {
+
+  const manager =
+    data.manager ||
+    {};
+
+
+  const name =
+    String(
+      manager.name ||
+      manager.fullName ||
+      "Специалист"
+    ).trim();
+
+
+  const photo =
+    String(
+      manager.photo ||
+      ""
+    ).trim();
+
+
+  const role =
+    String(
+      manager.role ||
+      "Специалист по вопросам задолженности"
+    ).trim();
+
+
+  const adMessage =
+    String(
+      data.adMessage ||
+      ""
+    ).trim();
+
+
+  document
+    .getElementById(
+      "managerName"
+    )
+    .textContent =
+    name;
+
+
+  document
+    .getElementById(
+      "managerRole"
+    )
+    .textContent =
+    role;
+
+
+  document
+    .getElementById(
+      "managerText"
+    )
+    .textContent =
+    adMessage ||
+    "Разберёмся, какие варианты могут быть в вашей ситуации.";
+
+
+  renderPhoto(
+    photo
+  );
+}
+
+
+// =====================================================
+// ФОТО
+// =====================================================
+
+function renderPhoto(
+  photoUrl
+) {
+
+  const image =
+    document.getElementById(
+      "managerPhoto"
+    );
+
+
+  const placeholder =
+    document.getElementById(
+      "photoPlaceholder"
+    );
+
+
+  if (!photoUrl) {
+
+    image.style.display =
+      "none";
+
+    placeholder.style.display =
+      "flex";
+
+    placeholder.textContent =
+      "Фото специалиста";
+
+    return;
+  }
+
+
+  image.onload =
+    function() {
+
+      image.style.display =
+        "block";
+
+      placeholder.style.display =
+        "none";
+    };
+
+
+  image.onerror =
+    function() {
+
+      image.style.display =
+        "none";
+
+      placeholder.style.display =
+        "flex";
+
+      placeholder.textContent =
+        "Фото специалиста";
+    };
+
+
+  image.src =
+    photoUrl;
+}
+
+
+// =====================================================
+// ПОКАЗ ОШИБКИ
+// =====================================================
+
+function showMiniAppError(
+  message
+) {
+
+  const box =
+    document.getElementById(
+      "errorBox"
+    );
+
+
+  box.style.display =
+    "block";
+
+
+  box.textContent =
+    message;
+
+
+  document
+    .getElementById(
+      "managerName"
+    )
+    .textContent =
+    "Специалист";
+
+
+  document
+    .getElementById(
+      "managerRole"
+    )
+    .textContent =
+    "По вопросам задолженности";
+
+
+  document
+    .getElementById(
+      "managerText"
+    )
+    .textContent =
+    "Попробуйте открыть страницу ещё раз.";
+
+
+  document
+    .getElementById(
+      "openBotButton"
+    )
+    .disabled =
+    false;
+
+
+  renderPhoto(
+    ""
+  );
+}
+
+
+// =====================================================
+// ЗАГРУЖАЕМ ДАННЫЕ ИЗ APPS SCRIPT
+// =====================================================
+
+function loadMiniAppData() {
+
+  currentSource =
+    getSource();
+
+
+  if (!currentSource) {
+
+    showMiniAppError(
+      "Не удалось определить код рекламы"
+    );
+
+    return;
+  }
+
+
+  const script =
+    document.createElement(
+      "script"
+    );
+
+
+  script.src =
+    APPS_SCRIPT_URL +
+    "?mode=miniapp" +
+    "&code=" +
+    encodeURIComponent(
+      currentSource
+    ) +
+    "&callback=handleMiniAppData" +
+    "&_=" +
+    Date.now();
+
+
+  script.onerror =
+    function() {
+
+      if (!miniAppLoaded) {
+
+        showMiniAppError(
+          "Не удалось загрузить данные специалиста"
+        );
+      }
+    };
+
+
+  document.body.appendChild(
+    script
+  );
+
+
+  setTimeout(
+    function() {
+
+      if (!miniAppLoaded) {
+
+        showMiniAppError(
+          "Сервис отвечает слишком долго. Попробуйте открыть страницу ещё раз."
+        );
+      }
+    },
+    8000
+  );
+}
+
+
+// =====================================================
+// СОХРАНЯЕМ ЛИД
+// =====================================================
+
 function saveLead() {
 
   const user =
@@ -537,6 +805,7 @@ function saveLead() {
 
 
   const source =
+    currentSource ||
     getSource();
 
 
@@ -602,9 +871,14 @@ function saveLead() {
 }
 
 
+// =====================================================
+// ОТКРЫВАЕМ БОТА
+// =====================================================
+
 function openBot() {
 
   const source =
+    currentSource ||
     getSource();
 
 
@@ -644,15 +918,17 @@ function openBot() {
 }
 
 
+// =====================================================
+// INIT
+// =====================================================
+
 function init() {
 
-  renderManager();
+  currentSource =
+    getSource();
 
 
-  setTimeout(
-    saveLead,
-    400
-  );
+  loadMiniAppData();
 }
 
 
