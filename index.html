@@ -41,9 +41,7 @@
       color: #132132;
     }
 
-
     .wrapper {
-
       max-width: 520px;
 
       margin: 0 auto;
@@ -54,9 +52,7 @@
         calc(24px + env(safe-area-inset-bottom));
     }
 
-
     .card {
-
       background: #ffffff;
 
       border-radius: 28px;
@@ -71,66 +67,39 @@
         rgba(25, 56, 78, .10);
     }
 
-
-    /* ЛОГОТИП */
-
     .logo-wrap {
-
       display: flex;
-
       justify-content: center;
-
       margin-bottom: 12px;
     }
 
-
     .logo {
-
       width: 170px;
-
       max-width: 55%;
-
       height: 64px;
-
       object-fit: contain;
-
       mix-blend-mode: multiply;
     }
 
-
-    /* ЗАГОЛОВОК */
-
     h1 {
-
       margin:
         0
         0
         17px;
 
       font-size: 30px;
-
       line-height: 1.05;
-
       letter-spacing: -.6px;
-
       text-align: center;
-
       color: #10253b;
     }
 
-
-    /* КАРТОЧКА СПЕЦИАЛИСТА */
-
     .manager {
-
       display: flex;
-
       align-items: center;
-
       gap: 16px;
 
       padding: 14px;
-
       margin-bottom: 18px;
 
       border-radius: 22px;
@@ -146,17 +115,13 @@
         1px solid #dcebf3;
     }
 
-
     .manager-photo-wrap {
-
       flex: 0 0 auto;
 
       width: 138px;
-
       height: 168px;
 
       border-radius: 19px;
-
       overflow: hidden;
 
       background: #dfe7eb;
@@ -166,13 +131,10 @@
         rgba(24, 69, 101, .15);
     }
 
-
     .manager-photo {
-
       display: block;
 
       width: 100%;
-
       height: 100%;
 
       object-fit: cover;
@@ -181,37 +143,27 @@
         center 22%;
     }
 
-
     .manager-info {
-
       min-width: 0;
-
       flex: 1;
     }
 
-
     .manager-label {
-
       margin-bottom: 6px;
 
       font-size: 11px;
-
       font-weight: 700;
 
       color: #6f7d89;
 
       text-transform: uppercase;
-
       letter-spacing: .5px;
     }
 
-
     .manager-name {
-
       margin-bottom: 7px;
 
       font-size: 21px;
-
       line-height: 1.1;
 
       font-weight: 800;
@@ -219,28 +171,20 @@
       color: #12283e;
     }
 
-
     .manager-role {
-
       font-size: 13px;
-
       line-height: 1.35;
 
       color: #4e5c67;
     }
 
-
-    /* КОРОТКАЯ ФРАЗА */
-
     .main-text {
-
       margin:
         3px
         0
         17px;
 
       font-size: 17px;
-
       line-height: 1.4;
 
       text-align: center;
@@ -248,15 +192,10 @@
       color: #3f4d59;
     }
 
-
-    /* КНОПКА */
-
     button {
-
       position: relative;
 
       width: 100%;
-
       min-height: 66px;
 
       padding:
@@ -266,7 +205,6 @@
         20px;
 
       border: 0;
-
       border-radius: 18px;
 
       cursor: pointer;
@@ -281,9 +219,7 @@
       color: #ffffff;
 
       font-size: 17px;
-
       font-weight: 800;
-
       line-height: 1.2;
 
       text-align: left;
@@ -297,28 +233,22 @@
         box-shadow .12s ease;
     }
 
-
     button::after {
-
       content: "→";
 
       position: absolute;
 
       right: 20px;
-
       top: 50%;
 
       transform:
         translateY(-50%);
 
       font-size: 28px;
-
       font-weight: 400;
     }
 
-
     button:active {
-
       transform:
         scale(.985);
 
@@ -327,32 +257,23 @@
         rgba(7, 111, 185, .22);
     }
 
-
-    /* ДИСКЛЕЙМЕР */
-
     .disclaimer {
-
       margin-top: 18px;
-
       padding-top: 15px;
 
       border-top:
         1px solid #e7ebee;
 
       font-size: 10.5px;
-
       line-height: 1.45;
 
       color: #6b747c;
     }
 
-
     .privacy {
-
       margin-top: 10px;
 
       font-size: 8.5px;
-
       line-height: 1.35;
 
       text-align: center;
@@ -360,48 +281,34 @@
       color: #a0a7ac;
     }
 
-
     @media (max-width: 390px) {
 
       h1 {
         font-size: 27px;
       }
 
-
       .manager {
-
         gap: 12px;
       }
 
-
       .manager-photo-wrap {
-
         width: 118px;
-
         height: 148px;
       }
 
-
       .manager-name {
-
         font-size: 18px;
       }
 
-
       .manager-role {
-
         font-size: 12px;
       }
 
-
       .main-text {
-
         font-size: 15px;
       }
 
-
       button {
-
         font-size: 16px;
       }
 
@@ -418,9 +325,6 @@
 
     <div class="card">
 
-
-      <!-- ЛОГОТИП -->
-
       <div class="logo-wrap">
 
         <img
@@ -432,14 +336,10 @@
       </div>
 
 
-      <!-- ЗАГОЛОВОК -->
-
       <h1>
         Банкротство граждан
       </h1>
 
-
-      <!-- МЕНЕДЖЕР -->
 
       <div class="manager">
 
@@ -461,14 +361,12 @@
             Ваш специалист
           </div>
 
-
           <div
             id="managerName"
             class="manager-name"
           >
-            Ирина Александровна
+            Специалист
           </div>
-
 
           <div
             id="managerRole"
@@ -482,8 +380,6 @@
       </div>
 
 
-      <!-- ОДНА КОРОТКАЯ ФРАЗА -->
-
       <div class="main-text">
 
         Разберёмся, какие варианты
@@ -492,8 +388,6 @@
       </div>
 
 
-      <!-- КНОПКА -->
-
       <button onclick="openBot()">
 
         Посмотреть,
@@ -501,8 +395,6 @@
 
       </button>
 
-
-      <!-- ДИСКЛЕЙМЕР -->
 
       <div class="disclaimer">
 
@@ -536,19 +428,54 @@
       "https://script.google.com/macros/s/AKfycbzQyaWoCmaXliVoISdh67ofzMBQ30RZE6rrLJg1NNNJ10tbT42mwA5jsPv-cuRTDVmU/exec";
 
 
+    const IRINA = {
+
+      name:
+        "Ирина Александровна",
+
+      role:
+        "Специалист по вопросам задолженности",
+
+      photo:
+        "https://drive.google.com/thumbnail?id=1F4fKFTHQB6Xh80b93AgEXR4LQ4x_p9-x&sz=w1200"
+    };
+
+
+    const VALERIA = {
+
+      name:
+        "Валерия Олеговна",
+
+      role:
+        "Специалист по вопросам задолженности",
+
+      photo:
+        "./valeria.jpg"
+    };
+
+
     const MANAGERS = {
 
-      POST001: {
+      POST001:
+        IRINA,
 
-        name:
-          "Ирина Александровна",
+      IRINA001:
+        IRINA,
 
-        role:
-          "Специалист по вопросам задолженности",
+      IRINA002:
+        IRINA,
 
-        photo:
-          "https://drive.google.com/thumbnail?id=1F4fKFTHQB6Xh80b93AgEXR4LQ4x_p9-x&sz=w1200"
-      }
+      IRINA003:
+        IRINA,
+
+      VALERIA001:
+        VALERIA,
+
+      VALERIA002:
+        VALERIA,
+
+      VALERIA003:
+        VALERIA
 
     };
 
