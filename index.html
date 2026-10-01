@@ -551,13 +551,6 @@ function renderManagerData(
     ).trim();
 
 
-  const adMessage =
-    String(
-      data.adMessage ||
-      ""
-    ).trim();
-
-
   document
     .getElementById(
       "managerName"
@@ -574,12 +567,16 @@ function renderManagerData(
     role;
 
 
+  // ВАЖНО:
+  // рекламный посыл data.adMessage
+  // больше НЕ показываем клиенту.
+  // Он остаётся в таблице и аналитике.
+
   document
     .getElementById(
       "managerText"
     )
     .textContent =
-    adMessage ||
     "Разберёмся, какие варианты могут быть в вашей ситуации.";
 
 
